@@ -1,0 +1,42 @@
+name: Release build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag of the release to attach the asset to'
+        required: true
+      asset_name:
+        description: 'Name of the uploaded ZIP'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Package ZIP
+        run: |
+          mkdir -p dist
+          zip -r -FS "dist/${{ inputs.asset_name }}" LICENSE README.md assets/* build/* icons/* manifest.json options/* popup/*
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" "dist/${{ inputs.asset_name }}" --clobber --repo "$GITHUB_REPOSITORY"
