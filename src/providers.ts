@@ -753,12 +753,92 @@ astecData.forEach((d) => {
   astecProviders[d.id] = <Provider>astecFactory(d)
 })
 
+// eBibliotheken Hessen: ein Sammel-Login für alle teilnehmenden Bibliotheken.
+// Zuerst wird die eigene Bibliothek ausgesucht, dann Ausweisnummer und Passwort
+// eingegeben. Alle Archive laufen über bib-hessen.genios.de.
+const selectEbibusLibrary = (userData) => {
+  const normalize = (value) =>
+    (value || '')
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+  const wanted = normalize(
+    Object.keys(userData)
+      .filter((key) => key.endsWith('.options.city'))
+      .map((key) => userData[key])
+      .find((value) => !!value)
+  )
+  if (!wanted) {
+    return false
+  }
+  const select: HTMLSelectElement = document.querySelector('#library_id')
+  if (!select) {
+    return false
+  }
+  const option = Array.from(select.options).find((o) => {
+    if (o.value === wanted) {
+      return true
+    }
+    const city = normalize(o.dataset.city)
+    const label = normalize(o.text)
+    return (
+      city === wanted ||
+      label === wanted ||
+      city.includes(wanted) ||
+      label.includes(wanted)
+    )
+  })
+  if (!option) {
+    return false
+  }
+  select.value = option.value
+  select.dispatchEvent(new Event('change'))
+  return true
+}
+
 const providers: Providers = {
   ...geniosDefaultProviders,
   ...geniosAssociationProviders,
   ...oclcProviders,
   ...hanProviders,
   ...astecProviders,
+  'login.ebibliotheken-hessen.de': {
+    name: 'eBibliotheken Hessen',
+    web: 'https://login.ebibliotheken-hessen.de/',
+    defaultSource: 'genios.de',
+    params: {
+      'genios.de': {
+        domain: 'bib-hessen.genios.de',
+      },
+    },
+    login: [
+      [
+        { message: 'Bibliothekskonto wird eingeloggt...' },
+        { func: selectEbibusLibrary },
+        {
+          fill: {
+            selector: '#card_number',
+            providerKey: 'login.ebibliotheken-hessen.de.options.username',
+          },
+        },
+        {
+          fill: {
+            selector: '#password',
+            providerKey: 'login.ebibliotheken-hessen.de.options.password',
+          },
+        },
+        { click: '#submitBtn' },
+      ],
+    ],
+    options: [
+      { id: 'city', display: 'Stadt deiner Bibliothek:', type: 'text' },
+      { id: 'username', display: 'Ausweisnummer:', type: 'text' },
+      { id: 'password', display: 'Passwort:', type: 'password' },
+    ],
+    permissions: ['https://login.ebibliotheken-hessen.de/*'],
+  },
   'www.duesseldorf.de': {
     name: 'Stadtbibliothek Düsseldorf',
     web: 'https://www.duesseldorf.de/stadtbuechereien/onlinebibliothek.html',
